@@ -4,9 +4,6 @@ import (
 	"fmt"
 	"log"
 	"math"
-	"os"
-	"os/exec"
-	"runtime"
 )
 
 func minMaxFloat64Slice(v []float64) (min, max float64) {
@@ -70,21 +67,7 @@ func interpolateArray(data []float64, fitCount int) []float64 {
 }
 
 // clear terminal screen
-var Clear func()
-
-func init() {
-	platform := runtime.GOOS
-
-	if platform == "windows" {
-		Clear = func() {
-			cmd := exec.Command("cmd", "/c", "cls")
-			cmd.Stdout = os.Stdout
-			if err := cmd.Run(); err != nil {
-				log.Fatal(err)
-			}
-		}
-	} else {
-		Clear = func() {
+var Clear = func() {
 			fmt.Print("\033[2J\033[H")
 		}
 	}
