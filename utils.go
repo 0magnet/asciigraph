@@ -2,7 +2,6 @@ package asciigraph
 
 import (
 	"fmt"
-	"log"
 	"math"
 )
 
