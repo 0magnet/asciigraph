@@ -70,5 +70,3 @@ func interpolateArray(data []float64, fitCount int) []float64 {
 var Clear = func() {
 			fmt.Print("\033[2J\033[H")
 		}
-	}
-}
