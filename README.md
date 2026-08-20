@@ -73,6 +73,29 @@ Running this example would render the following graph:
  0.00 ┼╯     ╰
 ```
 
+### Merging series at crossings
+
+Where two series meet in the same cell, whichever is drawn last wins, and the
+crossing reads as a break in the line underneath. `MergeSeries()` draws the
+junction instead: a `╯` meeting a `╰` becomes `┴`, a `─` meeting a `│` becomes
+`┼`, and so on for every combination of the four sides of a cell.
+
+```go
+	data := [][]float64{{0, 1, 2, 3, 3, 3, 2, 0}, {5, 4, 2, 1, 4, 6, 6}}
+	graph := asciigraph.PlotMany(data, asciigraph.MergeSeries())
+```
+
+The same graph as above, with the crossings joined:
+```bash
+ 6.00 ┤    ╭─
+ 5.00 ┼╮   │
+ 4.00 ┤╰╮ ╭╯
+ 3.00 ┤ │╭┼─╮
+ 2.00 ┤ ├┤│ ╰╮
+ 1.00 ┤╭╯╰╯  │
+ 0.00 ┼╯     ╰
+```
+
 ### Custom Y-axis value formatting
 
 Use `YAxisValueFormatter(...)` to control how values printed on the Y-axis are rendered.
@@ -352,6 +375,8 @@ Options:
     	lower bound set the minimum value for the vertical axis (ignored if series contains lower values) (default +Inf)
   -lc label color
     	y-axis label color of the plot
+  -m merge
+    	merge the junctions where series cross, e.g. drawing ┴ where ╯ meets ╰
   -o offset
     	offset in columns, for the label (default 3)
   -p precision

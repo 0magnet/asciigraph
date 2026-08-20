@@ -1051,3 +1051,91 @@ func TestThresholdAcrossSeries(t *testing.T) {
 		t.Errorf("expected:\n%q\n\ngot:\n%q", expected, actual)
 	}
 }
+
+func TestMergeSeriesJunctions(t *testing.T) {
+	// One series rises where the other falls, so both ends of the crossing land
+	// in the same two cells: "╭" meets "╮" as "┬", and "╯" meets "╰" as "┴".
+	actual := PlotMany([][]float64{{0, 1}, {1, 0}}, MergeSeries())
+	expected := " 1.00 ┼┬\n 0.00 ┼┴"
+	if actual != expected {
+		t.Errorf("expected:\n%q\n\ngot:\n%q", expected, actual)
+	}
+}
+
+func TestMergeSeriesCrossing(t *testing.T) {
+	// A flat line crossed by a steep one: "─" meets "│" as "┼". Without merging
+	// the vertical would punch a hole in the horizontal.
+	data := [][]float64{{1, 1, 1, 1, 1}, {0, 0, 2, 0, 0}}
+
+	plain := PlotMany(data, Height(2))
+	if !strings.Contains(plain, "│") || strings.Contains(plain, "┼─┼┼─") {
+		t.Errorf("expected the unmerged plot to keep its vertical bars:\n%s", plain)
+	}
+
+	actual := PlotMany(data, Height(2), MergeSeries())
+	expected := " 2.00 ┤ ╭╮\n 1.00 ┼─┼┼─\n 0.00 ┼─╯╰─"
+	if actual != expected {
+		t.Errorf("expected:\n%q\n\ngot:\n%q", expected, actual)
+	}
+}
+
+func TestMergeSeriesLeavesASingleSeriesAlone(t *testing.T) {
+	// With nothing to cross, merging must not change a plot at all.
+	series := []float64{3, 1, 4, 1, 5, 9, 2, 6}
+	plain := Plot(series, Height(6))
+	merged := Plot(series, Height(6), MergeSeries())
+	if plain != merged {
+		t.Errorf("merging changed a lone series:\nplain:\n%s\n\nmerged:\n%s", plain, merged)
+	}
+}
+
+func TestMergeSeriesIsOffByDefault(t *testing.T) {
+	// The second series overwrites the first where they meet, as it always has.
+	actual := PlotMany([][]float64{{0, 1}, {1, 0}})
+	expected := " 1.00 ┼╮\n 0.00 ┼╰"
+	if actual != expected {
+		t.Errorf("expected:\n%q\n\ngot:\n%q", expected, actual)
+	}
+}
+
+func TestMergeSeriesKeepsColors(t *testing.T) {
+	// A junction belongs to the series drawn last, which is the one that had to
+	// look at what was already there.
+	actual := PlotMany([][]float64{{0, 1}, {1, 0}}, SeriesColors(Red, Blue), MergeSeries())
+	if !strings.Contains(actual, "\x1b[94m┬") && !strings.Contains(actual, "\x1b[94m┴") {
+		t.Errorf("expected the junctions to carry the second series' color:\n%q", actual)
+	}
+}
+
+func TestMergeSeriesWithCustomCharSets(t *testing.T) {
+	// A custom character says nothing about which sides of the cell it touches,
+	// so a junction between two of them is drawn with box-drawing characters.
+	// Everywhere else each series keeps its own.
+	actual := PlotMany([][]float64{{0, 1}, {1, 0}},
+		SeriesChars(CreateCharSet("*"), CreateCharSet("#")),
+		MergeSeries())
+	if !strings.Contains(actual, "┬") || !strings.Contains(actual, "┴") {
+		t.Errorf("expected junctions to be drawn:\n%q", actual)
+	}
+
+	// The same series apart from the crossing keeps its own character.
+	apart := PlotMany([][]float64{{0, 1, 2}, {5, 5, 5}},
+		SeriesChars(CreateCharSet("*"), CreateCharSet("#")),
+		MergeSeries())
+	if !strings.Contains(apart, "*") || !strings.Contains(apart, "#") {
+		t.Errorf("expected each series to keep its character away from a crossing:\n%q", apart)
+	}
+}
+
+func TestMergeSeriesEveryPieceHasACharacter(t *testing.T) {
+	// Merging ORs two pieces together, so any of the sixteen combinations of
+	// the four sides may come out. All but the empty one must name a character.
+	for i := 1; i < len(pieceChars); i++ {
+		if pieceChars[i] == "" {
+			t.Errorf("no character for the piece touching sides %04b", i)
+		}
+	}
+	if pieceChars[0] != "" {
+		t.Errorf("the empty piece should draw nothing, got %q", pieceChars[0])
+	}
+}
