@@ -12,7 +12,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/guptarohit/asciigraph"
+	"github.com/0magnet/asciigraph"
 )
 
 var (

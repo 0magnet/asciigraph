@@ -3,7 +3,7 @@ package main
 import (
 	"fmt"
 
-	"github.com/guptarohit/asciigraph"
+	"github.com/0magnet/asciigraph"
 )
 
 func main() {
