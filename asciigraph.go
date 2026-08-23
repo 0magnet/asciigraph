@@ -258,16 +258,37 @@ func PlotMany(data [][]float64, options ...Option) string {
 	// draw puts one piece of a line into a cell. Without merging it overwrites,
 	// which is what it has always done. With merging, a piece landing where
 	// another series has already drawn becomes the character joining the two.
-	draw := func(row, col int, piece uint8, char string) {
+	draw := func(row, col int, piece uint8, char string, want AnsiColor) {
 		if !config.MergeSeries {
 			plot[row][col].Text = char
 			return
 		}
-		if prev := pieces[row][col]; prev != 0 {
-			merged := prev | piece
-			pieces[row][col] = merged
-			plot[row][col].Text = pieceChars[merged]
-			return
+		// Merge only where the two pieces genuinely CROSS, and only between
+		// lines already drawn in the same colour. Everything else overwrites,
+		// which is what this package has always done.
+		//
+		// Both conditions answer the same objection from two directions, and
+		// without them merging makes a multi-series plot harder to read rather
+		// than easier:
+		//
+		//   A union that is not a crossing is a T or an elbow, and a T says
+		//   these lines BRANCH. Applied to two curves that merely touch, it
+		//   welds them into one connected shape — three curves come out as a
+		//   single web, which is worse than the breaks it set out to fix.
+		//
+		//   A cell carries one colour, so a junction between differently
+		//   coloured lines has to credit one of them and lie about the other:
+		//   an orange line runs into a blue "┼" and appears to have become
+		//   blue. Neutral does not help — then it lies about both.
+		//
+		// A crossing between same-coloured lines is the one case where a
+		// junction says something true, so it is the only case that merges.
+		if prev := pieces[row][col]; prev != 0 && plot[row][col].Color == want {
+			if merged := prev | piece; merged == pieceAll {
+				pieces[row][col] = merged
+				plot[row][col].Text = pieceChars[merged]
+				return
+			}
 		}
 		pieces[row][col] = piece
 		plot[row][col].Text = char
@@ -302,14 +323,14 @@ func PlotMany(data [][]float64, options ...Option) string {
 
 			if math.IsNaN(d1) && !math.IsNaN(d0) {
 				y0 = int(round(d0*ratio) - float64(intmin2))
-				draw(rows-y0, x+config.Offset, pieceWest, charSet.EndCap)
+				draw(rows-y0, x+config.Offset, pieceWest, charSet.EndCap, pickColor(rows-y0, color))
 				plot[rows-y0][x+config.Offset].Color = pickColor(rows-y0, color)
 				continue
 			}
 
 			if math.IsNaN(d0) && !math.IsNaN(d1) {
 				y1 = int(round(d1*ratio) - float64(intmin2))
-				draw(rows-y1, x+config.Offset, pieceEast, charSet.StartCap)
+				draw(rows-y1, x+config.Offset, pieceEast, charSet.StartCap, pickColor(rows-y1, color))
 				plot[rows-y1][x+config.Offset].Color = pickColor(rows-y1, color)
 				continue
 			}
@@ -318,22 +339,22 @@ func PlotMany(data [][]float64, options ...Option) string {
 			y1 = int(round(d1*ratio) - float64(intmin2))
 
 			if y0 == y1 {
-				draw(rows-y0, x+config.Offset, pieceEast|pieceWest, charSet.Horizontal)
+				draw(rows-y0, x+config.Offset, pieceEast|pieceWest, charSet.Horizontal, pickColor(rows-y0, color))
 			} else {
 				if y0 > y1 {
 					// Descending: the top of the column comes in from the left
 					// and turns down, the bottom turns out to the right.
-					draw(rows-y1, x+config.Offset, pieceEast|pieceNorth, charSet.ArcUpRight)
-					draw(rows-y0, x+config.Offset, pieceSouth|pieceWest, charSet.ArcDownLeft)
+					draw(rows-y1, x+config.Offset, pieceEast|pieceNorth, charSet.ArcUpRight, pickColor(rows-y1, color))
+					draw(rows-y0, x+config.Offset, pieceSouth|pieceWest, charSet.ArcDownLeft, pickColor(rows-y0, color))
 				} else {
-					draw(rows-y1, x+config.Offset, pieceSouth|pieceEast, charSet.ArcDownRight)
-					draw(rows-y0, x+config.Offset, pieceNorth|pieceWest, charSet.ArcUpLeft)
+					draw(rows-y1, x+config.Offset, pieceSouth|pieceEast, charSet.ArcDownRight, pickColor(rows-y1, color))
+					draw(rows-y0, x+config.Offset, pieceNorth|pieceWest, charSet.ArcUpLeft, pickColor(rows-y0, color))
 				}
 
 				start := int(math.Min(float64(y0), float64(y1))) + 1
 				end := int(math.Max(float64(y0), float64(y1)))
 				for y := start; y < end; y++ {
-					draw(rows-y, x+config.Offset, pieceSouth|pieceNorth, charSet.VerticalLine)
+					draw(rows-y, x+config.Offset, pieceSouth|pieceNorth, charSet.VerticalLine, pickColor(rows-y, color))
 				}
 			}
 
@@ -568,6 +589,9 @@ const (
 	pieceNorth
 	pieceWest
 )
+
+// pieceAll is every side touched: the union of two pieces that cross.
+const pieceAll = pieceSouth | pieceEast | pieceNorth | pieceWest
 
 // pieceChars maps a set of touched sides to the character that draws it. Every
 // combination of the four bits has one, so a merge can never fail to name a
